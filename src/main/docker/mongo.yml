@@ -1,0 +1,18 @@
+version: '3.1'
+
+services:
+
+  mongo-chatgptassistant:
+    image: mongo
+    restart: always
+    ports:
+      - 27020:27017
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: Mtzyh3w4Fp4TZgpG
+    volumes:
+      - mongodbdata-chatgptassistant:/data/db
+
+volumes:
+  mongodbdata-chatgptassistant:
+    driver: local
