@@ -105,14 +105,14 @@ class ChatNodeService(
       return emptyList()
     }
 
-//    val ancestorLevel = node.ancestors.size
-//    val minLevel = ancestorLevel + 1
-//    val maxLevel = ancestorLevel + lowerLimit
+    val ancestorLevel = node.ancestors.size
+    val minLevel = ancestorLevel + 1
+    val maxLevel = ancestorLevel + lowerLimit
 
     return chatNodeRepository.findAllByChatIdAndAncestorsContaining(
       chatId = node.chatId,
-//      minSize = minLevel,
-//      maxSize = maxLevel,
+      minSize = minLevel,
+      maxSize = maxLevel,
       ancestorId = node.id
     )
   }
