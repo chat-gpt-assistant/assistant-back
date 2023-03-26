@@ -1,10 +1,11 @@
 spring:
-  profiles:
-    active: local
-
   data:
     mongodb:
+      host: localhost
+      port: 27017
       database: chatgptassistant
       username: root
+      password: Mtzyh3w4Fp4TZgpG
       authentication-database: admin
+      auto-index-creation: true
 
