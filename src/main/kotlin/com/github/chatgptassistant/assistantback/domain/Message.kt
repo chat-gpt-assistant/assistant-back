@@ -19,6 +19,6 @@ enum class ContentType {
 data class Message(
   val id: UUID,
   val author: Author,
-  val createTime: LocalDateTime,
+  val createTime: LocalDateTime = LocalDateTime.now(),
   val content: Content
 )
