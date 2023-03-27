@@ -7,8 +7,6 @@ import com.aallam.openai.client.OpenAI
 import com.github.chatgptassistant.assistantback.service.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.runBlocking
 import org.springframework.stereotype.Service
 import java.time.LocalDateTime
 
@@ -17,72 +15,64 @@ import java.time.LocalDateTime
 class OpenAIModelService(
   val openAI: OpenAI,
 ) : AIModelService {
-  override fun complete(input: AIModelInput): AIModelResponse {
+
+  override fun complete(input: AIModelInput): Flow<AIModelResponse> {
     val messages = input.messages
-    .map {
-    ChatMessage(
-      role = when (it.role) {
-        Role.User -> ChatRole.User
-        Role.Assistant -> ChatRole.Assistant
-        Role.System -> ChatRole.System
-        else -> throw IllegalArgumentException("Unknown role ${it.role}")
-      },
-      content = it.content ?: "",
-    )
-  }.toMutableList()
-
-  messages.add(0, ChatMessage(ChatRole.System, """
-    You are Bobby, a large language model trained by OpenAI. Answer as concisely as possible. Knowledge cutoff: Sep 2021 Current date: ${LocalDateTime.now()}
-  """.trimIndent()))
-
+      .map {
+        ChatMessage(
+          role = when (it.role) {
+            Role.User -> ChatRole.User
+            Role.Assistant -> ChatRole.Assistant
+            Role.System -> ChatRole.System
+            else -> throw IllegalArgumentException("Unknown role ${it.role}")
+          },
+          content = it.content ?: "",
+        )
+      }
 
     val chatCompletionRequest = ChatCompletionRequest(
       model = ModelId("gpt-3.5-turbo"),
-      messages = messages
+      messages = listOf(
+        ChatMessage(
+          ChatRole.System,
+          """
+          You are Bobby, a large language model trained by OpenAI. Answer as concisely as possible.
+          Knowledge cutoff: Sep 2021. Current date: ${LocalDateTime.now()}
+          """.trimIndent()
+        ),
+        *messages.toTypedArray()
+      )
     )
 
     val completions: Flow<ChatCompletionChunk> = openAI.chatCompletions(chatCompletionRequest)
 
-    return runBlocking {
-      return@runBlocking completions.map {
-        AIModelResponse(
-          id = it.id,
-          created = it.created,
-          model = it.model.id,
-          choices = it.choices.map { choice ->
-            AIModelChatChunk(
-              index = choice.index,
-              delta = AIModelChatDelta(
-                role = when (choice.delta?.role) {
-                  ChatRole.User -> Role.User
-                  ChatRole.Assistant -> Role.Assistant
-                  ChatRole.System -> Role.System
-                  else -> Role.Assistant
-                },
-                content = choice.delta?.content,
-                name = choice.delta?.name
-              ),
-              finishReason = choice.finishReason
-            )
-          },
-          usage = AIModelUsage(
-            promptTokens = it.usage?.promptTokens,
-            completionTokens = it.usage?.completionTokens,
-            totalTokens = it.usage?.totalTokens
+    return completions.map {
+      AIModelResponse(
+        id = it.id,
+        created = it.created,
+        model = it.model.id,
+        choices = it.choices.map { choice ->
+          AIModelChatChunk(
+            index = choice.index,
+            delta = AIModelChatDelta(
+              role = when (choice.delta?.role) {
+                ChatRole.User -> Role.User
+                ChatRole.Assistant -> Role.Assistant
+                ChatRole.System -> Role.System
+                else -> Role.Assistant
+              },
+              content = choice.delta?.content,
+              name = choice.delta?.name
+            ),
+            finishReason = choice.finishReason
           )
+        },
+        usage = AIModelUsage(
+          promptTokens = it.usage?.promptTokens,
+          completionTokens = it.usage?.completionTokens,
+          totalTokens = it.usage?.totalTokens
         )
-      }.toList()
-        .reduce { acc, aiModelResponse ->
-          val combinedContent = (acc.choices[0].delta?.content ?: "") + (aiModelResponse.choices[0].delta?.content ?: "")
-
-          return@reduce acc.copy(
-            choices = listOf(
-              acc.choices[0].copy(
-                delta = acc.choices[0].delta?.copy(content = combinedContent)
-              )
-            )
-          )
-        }
+      )
     }
   }
 

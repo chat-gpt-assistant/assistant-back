@@ -17,7 +17,7 @@ interface MessageUseCase { // TODO: rename
    * @param lowerLimit lower limit of messages
    * @return list of chat nodes
    */
-  fun fetchAllMessages(chatId: UUID, currentNode: UUID?, upperLimit: Int, lowerLimit: Int): List<ChatNode>
+  suspend fun fetchAllMessages(chatId: UUID, currentNode: UUID?, upperLimit: Int, lowerLimit: Int): List<ChatNode>
 
   /**
    * Post a message to the chat and generate AI model response.
@@ -26,7 +26,7 @@ interface MessageUseCase { // TODO: rename
    * @param content message content
    * @return response message
    */
-  fun postMessageAndGenerateResponse(chatId: UUID, content: Content): List<ChatNode>
+  suspend fun postMessageAndGenerateResponse(chatId: UUID, content: Content): List<ChatNode>
 
   /**
    * Edit a message and regenerate AI model response.
@@ -36,7 +36,7 @@ interface MessageUseCase { // TODO: rename
    * @param newContent new message content
    * @return pair of edited message and response message
    */
-  fun editMessageAndRegenerateResponse(
+  suspend fun editMessageAndRegenerateResponse(
     chatId: UUID,
     messageId: UUID,
     newContent: Content
@@ -49,7 +49,7 @@ interface MessageUseCase { // TODO: rename
    * @param messageId message id
    * @return response message
    */
-  fun regenerateResponse(chatId: UUID, messageId: UUID): ChatNode
+  suspend fun regenerateResponse(chatId: UUID, messageId: UUID): ChatNode
 
 }
 

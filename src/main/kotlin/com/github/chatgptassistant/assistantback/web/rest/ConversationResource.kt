@@ -16,7 +16,7 @@ class ConversationResource(
 ) {
 
   @GetMapping
-  fun getConversation(
+  suspend fun getConversation(
     @RequestHeader("Authorization") userEmail: String,
     @PathVariable chatId: UUID,
     @RequestParam(required = false) currentNode: UUID?,
@@ -30,7 +30,7 @@ class ConversationResource(
   }
 
   @PostMapping
-  fun addMessageToConversation(
+  suspend fun addMessageToConversation(
     @RequestHeader("Authorization") userEmail: String,
     @PathVariable chatId: UUID,
     @RequestBody messageRequest: MessageRequest
@@ -42,7 +42,7 @@ class ConversationResource(
   }
 
   @PatchMapping("/{messageId}")
-  fun editConversationMessage(
+  suspend fun editConversationMessage(
     @RequestHeader("Authorization") userEmail: String,
     @PathVariable chatId: UUID,
     @PathVariable messageId: UUID,
@@ -55,7 +55,7 @@ class ConversationResource(
   }
 
   @PostMapping("/{messageId}/regenerated-response")
-  fun regenerateResponseForMessage(
+  suspend fun regenerateResponseForMessage(
     @RequestHeader("Authorization") userEmail: String,
     @PathVariable chatId: UUID,
     @PathVariable messageId: UUID

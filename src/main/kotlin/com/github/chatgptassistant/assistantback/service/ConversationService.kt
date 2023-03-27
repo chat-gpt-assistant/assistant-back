@@ -22,11 +22,11 @@ class ConversationService(
    * @param lowerLimit lower limit of messages
    * @return conversation with messages
    */
-  fun getConversation(chatId: UUID, currentNode: UUID?, upperLimit: Int, lowerLimit: Int): Conversation {
+  suspend fun getConversation(chatId: UUID, currentNode: UUID?, upperLimit: Int, lowerLimit: Int): Conversation {
     val chatNodes = messageUseCase.fetchAllMessages(chatId, currentNode, upperLimit, lowerLimit)
 
     val chat = chatRepository.findById(chatId)
-      .orElseThrow { NoSuchElementException("Chat not found") }
+      ?: throw NoSuchElementException("Chat not found")
 
     return Conversation.from(chat, chatNodes)
   }
@@ -37,11 +37,11 @@ class ConversationService(
    * @param messageRequest message request
    * @return conversation with added message
    */
-  fun addMessageToConversation(chatId: UUID, messageRequest: MessageRequest): Conversation {
+  suspend fun addMessageToConversation(chatId: UUID, messageRequest: MessageRequest): Conversation {
     val chatNodes = messageUseCase.postMessageAndGenerateResponse(chatId, Content.fromText(messageRequest.content))
 
     val chat = chatRepository.findById(chatId)
-      .orElseThrow { NoSuchElementException("Chat not found") }
+      ?: throw NoSuchElementException("Chat not found")
 
     return Conversation.from(chat, chatNodes)
   }
@@ -53,7 +53,7 @@ class ConversationService(
    * @param messageRequest message request
    * @return conversation with edited message
    */
-  fun editConversationMessage(chatId: UUID, nodeId: UUID, messageRequest: MessageRequest): Conversation {
+  suspend fun editConversationMessage(chatId: UUID, nodeId: UUID, messageRequest: MessageRequest): Conversation {
     val chatNodes = messageUseCase.editMessageAndRegenerateResponse(
       chatId,
       nodeId,
@@ -61,7 +61,7 @@ class ConversationService(
     )
 
     val chat = chatRepository.findById(chatId)
-      .orElseThrow { NoSuchElementException("Chat not found") }
+      ?: throw NoSuchElementException("Chat not found")
 
     return Conversation.from(chat, chatNodes)
   }
@@ -72,11 +72,11 @@ class ConversationService(
    * @param messageId message id
    * @return conversation with regenerated response
    */
-  fun regenerateResponseForMessage(chatId: UUID, messageId: UUID): Conversation {
+  suspend fun regenerateResponseForMessage(chatId: UUID, messageId: UUID): Conversation {
     val chatNode = messageUseCase.regenerateResponse(chatId, messageId)
 
     val chat = chatRepository.findById(chatId)
-      .orElseThrow { NoSuchElementException("Chat not found") }
+      ?: throw NoSuchElementException("Chat not found")
 
     return Conversation.from(chat, listOf(chatNode))
   }

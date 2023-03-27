@@ -4,6 +4,10 @@ import com.github.chatgptassistant.assistantback.domain.*
 import com.github.chatgptassistant.assistantback.repository.ChatNodeRepository
 import com.github.chatgptassistant.assistantback.repository.ChatRepository
 import com.github.chatgptassistant.assistantback.usecase.MessageUseCase
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.reduce
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.runBlocking
 import org.springframework.stereotype.Service
 import java.util.*
 
@@ -15,23 +19,23 @@ class MessageService(
   private val chatNodeRepository: ChatNodeRepository,
 ) : MessageUseCase {
 
-  override fun fetchAllMessages(
+  override suspend fun fetchAllMessages(
     chatId: UUID,
     currentNode: UUID?,
     upperLimit: Int,
     lowerLimit: Int
   ): List<ChatNode> {
     val chat = chatRepository.findById(chatId)
-      .orElseThrow { NoSuchElementException("Chat not found") }
+      ?: throw NoSuchElementException("Chat not found")
 
     val currentNodeId = currentNode ?: chat.currentNode ?: return emptyList()
 
     return chatNodeService.fetchSubTree(chatId, currentNodeId, upperLimit, lowerLimit)
   }
 
-  override fun postMessageAndGenerateResponse(chatId: UUID, content: Content): List<ChatNode> {
+  override suspend fun postMessageAndGenerateResponse(chatId: UUID, content: Content): List<ChatNode> {
     val chat = chatRepository.findById(chatId)
-      .orElseThrow { NoSuchElementException("Chat not found") }
+      ?: throw NoSuchElementException("Chat not found")
 
     val chatNode = chatNodeService.createChatNode(
       chat = chat,
@@ -49,13 +53,13 @@ class MessageService(
     return listOf(chatNode, aiModelResponses)
   }
 
-  override fun editMessageAndRegenerateResponse(
+  override suspend fun editMessageAndRegenerateResponse(
     chatId: UUID,
     messageId: UUID,
     newContent: Content
   ): List<ChatNode> {
     val chat = chatRepository.findById(chatId)
-      .orElseThrow { NoSuchElementException("Chat not found") }
+      ?: throw NoSuchElementException("Chat not found")
 
     val oldMessageNode = chatNodeRepository.findByIdAndChatId(messageId, chatId)
       ?: throw NoSuchElementException("ChatNode not found")
@@ -72,9 +76,9 @@ class MessageService(
     return listOf(newMessageNode, aiModelResponse)
   }
 
-  override fun regenerateResponse(chatId: UUID, messageId: UUID): ChatNode {
+  override suspend fun regenerateResponse(chatId: UUID, messageId: UUID): ChatNode {
     val chat = chatRepository.findById(chatId)
-      .orElseThrow { NoSuchElementException("Chat not found") }
+      ?: throw NoSuchElementException("Chat not found")
 
     val chatNode = chatNodeRepository.findByIdAndChatId(messageId, chatId)
       ?: throw NoSuchElementException("ChatNode not found")
@@ -84,7 +88,7 @@ class MessageService(
     return generateAIModelResponseAndAddToChat(chat, chatNode.message, parentNode)
   }
 
-  private fun generateAIModelResponseAndAddToChat(
+  private suspend fun generateAIModelResponseAndAddToChat(
     chat: Chat,
     message: Message,
     parentChatNode: ChatNode?
@@ -92,7 +96,20 @@ class MessageService(
     val ancestorsSize = parentChatNode?.ancestors?.size ?: 0
     val aiModelInput = buildAIModelInput(chat, message, ancestorsSize)
 
+    // when Flow is complete we should store it in DB, but meanwhile we will send chunks to user
     val response = aiModelService.complete(aiModelInput)
+      .toList()
+      .reduce { acc, aiModelResponse ->
+        val combinedContent = (acc.choices[0].delta?.content ?: "") + (aiModelResponse.choices[0].delta?.content ?: "")
+
+        return@reduce acc.copy(
+          choices = listOf(
+            acc.choices[0].copy(
+              delta = acc.choices[0].delta?.copy(content = combinedContent)
+            )
+          )
+        )
+      }
 
     val responseContent = Content(
       type = ContentType.TEXT,
@@ -103,10 +120,12 @@ class MessageService(
     val responseChatNode = chatNodeService.createChatNode(chat, parentChatNode?.id, responseMessage)
 
     chatRepository.save(chat.copy(currentNode = responseChatNode.id))
+
+
     return responseChatNode
   }
 
-  private fun buildAIModelInput(chat: Chat, message: Message, ancestorsSize: Int): AIModelInput {
+  private suspend fun buildAIModelInput(chat: Chat, message: Message, ancestorsSize: Int): AIModelInput {
     val contextLimitInChars =
       aiModelService.getContextLimitInChars() * .7 //TODO: fix. Half of the context for input and half for output
     val batchSize = 20

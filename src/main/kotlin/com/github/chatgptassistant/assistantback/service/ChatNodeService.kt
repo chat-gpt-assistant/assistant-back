@@ -4,6 +4,7 @@ import com.github.chatgptassistant.assistantback.domain.Chat
 import com.github.chatgptassistant.assistantback.domain.ChatNode
 import com.github.chatgptassistant.assistantback.domain.Message
 import com.github.chatgptassistant.assistantback.repository.ChatNodeRepository
+import kotlinx.coroutines.flow.*
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Service
 import java.util.*
@@ -25,7 +26,7 @@ class ChatNodeService(
    * @return list of chat nodes in the subtree
    * @throws NoSuchElementException if the node with id [currentNodeId] is not found in chat with id [chatId]
    */
-  fun fetchSubTree(
+  suspend fun fetchSubTree(
     chatId: UUID,
     currentNodeId: UUID,
     upperLimit: Int = 0,
@@ -37,7 +38,7 @@ class ChatNodeService(
     val ancestors = findAncestors(currentNode, upperLimit)
     val descendants = findDescendants(currentNode, lowerLimit)
 
-    return ancestors + currentNode + descendants
+    return ancestors.toList() + currentNode + descendants.toList()
   }
 
   /**
@@ -49,7 +50,7 @@ class ChatNodeService(
    * @return the newly created chat node
    * @throws NoSuchElementException if the parent chat node with id [parentChatNodeId] is not found in chat with id [chatId]
    */
-  fun createChatNode(chat: Chat, parentChatNodeId: UUID?, message: Message): ChatNode {
+  suspend fun createChatNode(chat: Chat, parentChatNodeId: UUID?, message: Message): ChatNode {
     val parentNode: ChatNode? = parentChatNodeId?.let {
       chatNodeRepository.findByIdAndChatId(it, chat.id)
         ?: throw NoSuchElementException("Parent ChatNode with id $it not found in chat with id $chat.id")
@@ -83,12 +84,13 @@ class ChatNodeService(
    * @param chatNodeId id of the chat node to be deleted
    * @return the parent chat node of the deleted chat node
    */
-  fun deleteNodeAndDescendants(chatId: UUID, chatNodeId: UUID): ChatNode? {
+  suspend fun deleteNodeAndDescendants(chatId: UUID, chatNodeId: UUID): ChatNode? {
     val currentNode = chatNodeRepository.findByIdAndChatId(chatNodeId, chatId)
       ?: throw NoSuchElementException("ChatNode not found")
 
     findDescendants(currentNode, Int.MAX_VALUE)
       .map { it.id }
+      .toList()
       .let { chatNodeRepository.deleteAllById(it) }
 
     chatNodeRepository.delete(currentNode)
@@ -102,14 +104,14 @@ class ChatNodeService(
     }
   }
 
-  private fun findAncestors(node: ChatNode, upperLimit: Int): List<ChatNode> {
+  private fun findAncestors(node: ChatNode, upperLimit: Int): Flow<ChatNode> {
     val ancestorsToFetch = node.ancestors.takeLast(upperLimit)
     return chatNodeRepository.findAllById(ancestorsToFetch, Sort.by("message.createTime"))
   }
 
-  private fun findDescendants(node: ChatNode, lowerLimit: Int): List<ChatNode> {
+  private fun findDescendants(node: ChatNode, lowerLimit: Int): Flow<ChatNode> {
     if (lowerLimit == 0) {
-      return emptyList()
+      return emptyList<ChatNode>().asFlow()
     }
 
     return chatNodeRepository.findAllByChatIdAndAncestorsContaining(

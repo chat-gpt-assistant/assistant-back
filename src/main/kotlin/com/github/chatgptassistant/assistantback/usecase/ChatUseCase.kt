@@ -1,6 +1,7 @@
 package com.github.chatgptassistant.assistantback.usecase
 
 import com.github.chatgptassistant.assistantback.domain.Chat
+import kotlinx.coroutines.flow.Flow
 import org.springframework.data.domain.Page
 import java.util.*
 
@@ -15,7 +16,7 @@ interface ChatUseCase {
    * @param title chat title
    * @return created chat
    */
-  fun createChat(userId: UUID, title: String): Chat
+  suspend fun createChat(userId: UUID, title: String): Chat
 
   /**
    * Delete a chat.
@@ -23,14 +24,14 @@ interface ChatUseCase {
    * @param userId user id
    * @param chatId chat id
    */
-  fun deleteChat(userId: UUID, chatId: UUID)
+  suspend fun deleteChat(userId: UUID, chatId: UUID)
 
   /**
    * Delete all chats for a user.
    *
    * @param userId user id
    */
-  fun deleteAllChats(userId: UUID)
+  suspend fun deleteAllChats(userId: UUID)
 
   /**
    * Fetch all chats for a user.
@@ -40,7 +41,7 @@ interface ChatUseCase {
    * @param size page size
    * @return page of chats
    */
-  fun fetchAllChats(userId: UUID, page: Int, size: Int): Page<Chat>
+  fun fetchAllChats(userId: UUID, page: Int, size: Int): Flow<Chat>
 
   /**
    * Update chat title.
@@ -49,5 +50,5 @@ interface ChatUseCase {
    * @param chatId chat id
    * @return chat
    */
-  fun updateChatTitle(userId: UUID, chatId: UUID, newTitle: String): Chat
+  suspend fun updateChatTitle(userId: UUID, chatId: UUID, newTitle: String): Chat
 }

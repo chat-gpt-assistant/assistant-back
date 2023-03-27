@@ -1,5 +1,7 @@
 package com.github.chatgptassistant.assistantback.service
 
+import kotlinx.coroutines.flow.Flow
+
 data class AIModelInput(
   val messages: List<AIModelChatDelta>
 )
@@ -45,7 +47,7 @@ interface AIModelService {
    * @param input the input to complete
    * @return the response
    */
-  fun complete(input: AIModelInput): AIModelResponse
+  fun complete(input: AIModelInput): Flow<AIModelResponse>
 
   /**
    * Get the context limit in chars
