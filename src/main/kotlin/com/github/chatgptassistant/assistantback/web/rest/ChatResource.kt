@@ -1,10 +1,11 @@
 package com.github.chatgptassistant.assistantback.web.rest
 
-import com.github.chatgptassistant.assistantback.domain.Chat
+import com.github.chatgptassistant.assistantback.dto.ChatDTO
 import com.github.chatgptassistant.assistantback.dto.CreateChatRequest
 import com.github.chatgptassistant.assistantback.repository.UserRepository
 import com.github.chatgptassistant.assistantback.usecase.ChatUseCase
 import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.web.bind.annotation.*
 import java.util.*
 
@@ -17,23 +18,24 @@ class ChatController(
   @GetMapping
   fun fetchAllChats(
     @RequestHeader("Authorization") userEmail: String,
-    @RequestParam(defaultValue = "0") page: Int,
-    @RequestParam(defaultValue = "20") size: Int
-  ): Page<Chat> {
+    pageable: Pageable
+  ): Page<ChatDTO> {
     val user = (userRepository.findByEmail(userEmail)
       ?: throw NoSuchElementException("User not found"))
 
-    return chatUseCase.fetchAllChats(user.id, page, size)
+    return chatUseCase.fetchAllChats(user.id, pageable.pageNumber, pageable.pageSize)
+      .map { ChatDTO.from(it) }
   }
 
   @PostMapping
   fun createChat(@RequestHeader("Authorization") userEmail: String,
                  @RequestBody createChatRequest: CreateChatRequest
-  ): Chat {
+  ): ChatDTO {
     val user = (userRepository.findByEmail(userEmail)
       ?: throw NoSuchElementException("User not found"))
 
     return chatUseCase.createChat(user.id, createChatRequest.title)
+      .let { ChatDTO.from(it) }
   }
 
   @PatchMapping("/{chatId}")
@@ -41,11 +43,12 @@ class ChatController(
     @RequestHeader("Authorization") userEmail: String,
     @PathVariable chatId: UUID,
     @RequestBody createChatRequest: CreateChatRequest
-  ): Chat {
+  ): ChatDTO {
     val user = (userRepository.findByEmail(userEmail)
       ?: throw NoSuchElementException("User not found"))
 
     return chatUseCase.updateChatTitle(user.id, chatId, createChatRequest.title)
+      .let { ChatDTO.from(it) }
   }
 
   @DeleteMapping("/{chatId}")
@@ -58,7 +61,7 @@ class ChatController(
   }
 
   @DeleteMapping
-  fun deleteAllChats(@RequestHeader("Authorization") userEmail: String,) {
+  fun deleteAllChats(@RequestHeader("Authorization") userEmail: String) {
     val user = (userRepository.findByEmail(userEmail)
       ?: throw NoSuchElementException("User not found"))
 
