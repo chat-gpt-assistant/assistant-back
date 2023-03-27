@@ -4,6 +4,7 @@ import com.github.chatgptassistant.assistantback.domain.Chat
 import com.github.chatgptassistant.assistantback.domain.ChatNode
 import com.github.chatgptassistant.assistantback.domain.Message
 import com.github.chatgptassistant.assistantback.repository.ChatNodeRepository
+import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Service
 import java.util.*
 
@@ -103,7 +104,7 @@ class ChatNodeService(
 
   private fun findAncestors(node: ChatNode, upperLimit: Int): List<ChatNode> {
     val ancestorsToFetch = node.ancestors.takeLast(upperLimit)
-    return chatNodeRepository.findAllById(ancestorsToFetch).reversed()
+    return chatNodeRepository.findAllById(ancestorsToFetch, Sort.by("message.createTime"))
   }
 
   private fun findDescendants(node: ChatNode, lowerLimit: Int): List<ChatNode> {
@@ -113,7 +114,8 @@ class ChatNodeService(
 
     return chatNodeRepository.findAllByChatIdAndAncestorsContaining(
       chatId = node.chatId,
-      ancestorId = node.id
+      ancestorId = node.id,
+      Sort.by("message.createTime")
     )
   }
 

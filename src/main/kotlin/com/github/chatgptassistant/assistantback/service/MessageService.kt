@@ -89,12 +89,15 @@ class MessageService(
     message: Message,
     parentChatNode: ChatNode?
   ): ChatNode {
-    val ancestorsSize = parentChatNode?.ancestors?.size?.plus(1) ?: 0
+    val ancestorsSize = parentChatNode?.ancestors?.size ?: 0
     val aiModelInput = buildAIModelInput(chat, message, ancestorsSize)
 
     val response = aiModelService.complete(aiModelInput)
 
-    val responseContent = Content(type = ContentType.TEXT, parts = listOf(response.choices[0].message.content))
+    val responseContent = Content(
+      type = ContentType.TEXT,
+      parts = listOf(response.choices[0].delta!!.content!!)
+    )
     val responseMessage = Message(UUID.randomUUID(), Author.ASSISTANT, content = responseContent)
 
     val responseChatNode = chatNodeService.createChatNode(chat, parentChatNode?.id, responseMessage)
@@ -104,21 +107,31 @@ class MessageService(
   }
 
   private fun buildAIModelInput(chat: Chat, message: Message, ancestorsSize: Int): AIModelInput {
-    val contextLimitInChars = aiModelService.getContextLimitInChars() / 2 //TODO: fix. Half of the context for input and half for output
-    val batchSize = 10
+    val contextLimitInChars =
+      aiModelService.getContextLimitInChars() * .7 //TODO: fix. Half of the context for input and half for output
+    val batchSize = 20
 
-    val messages = mutableListOf<AIModelMessage>()
+    val messages = mutableListOf<AIModelChatDelta>()
     var charsCount = 0
     var lastNode = message.id
 
-    for (i in 1..ancestorsSize) {
-      val subTree = chatNodeService.fetchSubTree(chat.id, lastNode, batchSize, 0)
-      lastNode = subTree.first().id
+    for (i in 1..ancestorsSize + 1 step batchSize) {
+      val subTree = chatNodeService.fetchSubTree(chat.id, lastNode, batchSize - 1, 0)
 
       subTree
-        .map { it.message.content.parts.joinToString(separator = " ") }
+        .reversed()
+        .map {
+          AIModelChatDelta(
+            role = when (it.message.author) {
+              Author.ASSISTANT -> Role.Assistant
+              Author.USER -> Role.User
+              Author.SYSTEM -> Role.System
+            },
+            content = it.message.content.parts.joinToString(separator = " ")
+          )
+        }
         .takeWhile {
-          val newCharsCount = charsCount + it.length
+          val newCharsCount = charsCount + (it.content?.length ?: 0)
           if (newCharsCount > contextLimitInChars) {
             false
           } else {
@@ -126,11 +139,16 @@ class MessageService(
             true
           }
         }
-        .map { AIModelMessage(role = Role.USER, content = it) }
         .let { messages.addAll(it) }
+
+      if (charsCount >= contextLimitInChars) {
+        break;
+      }
+
+      lastNode = subTree.first().parent ?: break
     }
 
-    return AIModelInput(messages)
+    return AIModelInput(messages.reversed())
   }
 }
 

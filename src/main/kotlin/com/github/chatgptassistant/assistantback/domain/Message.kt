@@ -4,7 +4,7 @@ import java.time.LocalDateTime
 import java.util.*
 
 enum class Author {
-  ASSISTANT, USER
+  ASSISTANT, USER, SYSTEM
 }
 
 data class Content(

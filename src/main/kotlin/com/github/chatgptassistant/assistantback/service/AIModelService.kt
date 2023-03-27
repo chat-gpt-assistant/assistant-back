@@ -1,59 +1,41 @@
 package com.github.chatgptassistant.assistantback.service
 
 data class AIModelInput(
-  val messages: List<AIModelMessage>
+  val messages: List<AIModelChatDelta>
 )
 
 data class AIModelResponse(
   val id: String,
-  val objectName: String,
-  val created: Long,
+  val created: Int,
   val model: String,
-  val choices: List<AIModelChoice>,
-  val usage: AIModelUsage
+  val choices: List<AIModelChatChunk>,
+  val usage: AIModelUsage? = null
 )
 
-data class AIModelChoice(
-  val index: Int,
-  val message: AIModelMessage,
-  val finishReason: FinishReason
+data class AIModelChatChunk(
+  val index: Int? = null,
+  val delta: AIModelChatDelta? = null,
+  val finishReason: String? = null
 )
 
 data class AIModelUsage(
-  val promptTokens: Int,
-  val completionTokens: Int,
-  val totalTokens: Int
+  val promptTokens: Int? = null,
+  val completionTokens: Int? = null,
+  val totalTokens: Int? = null
 )
 
-data class AIModelMessage(
-  val role: Role,
-  val content: String
+data class AIModelChatDelta(
+  val role: Role? = null,
+  val content: String? = null,
+  val name: String? = null,
 )
 
-enum class FinishReason(val value: String) {
-  /**
-   * API returned complete model output
-   */
-  STOP("stop"),
-
-  /**
-   * Incomplete model output due to max_tokens parameter or token limit
-   */
-  LENGTH("length"),
-
-  /**
-   * Omitted content due to a flag from our content filters
-   */
-  CONTENT_FILTER("content_filter"),
-
-  /**
-   * API response still in progress or incomplete
-   */
-  NULL("null"),
-}
-
-enum class Role {
-  SYSTEM, USER, ASSISTANT
+data class Role(val role: String) {
+  companion object {
+    val System: Role = Role("system")
+    val User: Role = Role("user")
+    val Assistant: Role = Role("assistant")
+  }
 }
 
 interface AIModelService {

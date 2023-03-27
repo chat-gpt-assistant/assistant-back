@@ -38,6 +38,11 @@ dependencies {
 //	testImplementation("org.springframework.security:spring-security-test")
 	testImplementation("org.testcontainers:junit-jupiter")
 	testImplementation("org.testcontainers:mongodb")
+
+	// import Kotlin API for OpenAI
+	implementation(platform("com.aallam.openai:openai-client-bom:3.2.0"))
+	implementation("com.aallam.openai:openai-client")
+	implementation("io.ktor:ktor-client-okhttp")
 }
 
 dependencyManagement {
