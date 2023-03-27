@@ -1,6 +1,7 @@
 package com.github.chatgptassistant.assistantback.service
 
 import com.github.chatgptassistant.assistantback.domain.Chat
+import com.github.chatgptassistant.assistantback.repository.ChatNodeRepository
 import com.github.chatgptassistant.assistantback.repository.ChatRepository
 import com.github.chatgptassistant.assistantback.repository.UserRepository
 import com.github.chatgptassistant.assistantback.usecase.ChatUseCase
@@ -12,7 +13,8 @@ import java.util.*
 @Service
 class ChatService(
   private val chatRepository: ChatRepository,
-  private val userRepository: UserRepository
+  private val userRepository: UserRepository,
+  private val chatNodeRepository: ChatNodeRepository
 ) : ChatUseCase {
 
   override fun createChat(userId: UUID, title: String): Chat {
@@ -31,6 +33,7 @@ class ChatService(
   }
 
   override fun deleteAllChats(userId: UUID) {
+    chatNodeRepository.deleteAllByUserId(userId)
     chatRepository.deleteAllByUserId(userId)
   }
 

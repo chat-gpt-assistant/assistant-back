@@ -1,11 +1,13 @@
 package com.github.chatgptassistant.assistantback.domain
 
-import org.springframework.data.annotation.Id
+import org.springframework.data.mongodb.core.mapping.Document
+import org.springframework.data.mongodb.core.mapping.MongoId
 import java.time.LocalDateTime
 import java.util.*
 
+@Document(collection = "chats")
 data class Chat(
-  @Id
+  @MongoId
   val id: UUID,
   val userId: UUID,
   val title: String,

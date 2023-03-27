@@ -1,10 +1,12 @@
 package com.github.chatgptassistant.assistantback.domain
 
-import org.springframework.data.annotation.Id
+import org.springframework.data.mongodb.core.mapping.Document
+import org.springframework.data.mongodb.core.mapping.MongoId
 import java.util.*
 
+@Document(collection = "users")
 data class User(
-  @Id
+  @MongoId
   val id: UUID,
   val email: String,
   val name: String,

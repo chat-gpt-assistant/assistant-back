@@ -1,12 +1,13 @@
 package com.github.chatgptassistant.assistantback.service
 
+import com.github.chatgptassistant.assistantback.domain.Chat
 import com.github.chatgptassistant.assistantback.domain.ChatNode
 import com.github.chatgptassistant.assistantback.domain.Message
 import com.github.chatgptassistant.assistantback.repository.ChatNodeRepository
 import org.springframework.stereotype.Service
 import java.util.*
 
-//TODO: do we need an interface for this?
+//TODO: do we need an interface for this? Maybe we can turn it into CustomRepository?
 @Service
 class ChatNodeService(
   private val chatNodeRepository: ChatNodeRepository
@@ -41,16 +42,16 @@ class ChatNodeService(
   /**
    * Creates a new chat node in chat with id [chatId] with parent node with id [parentChatNodeId] and message [message].
    *
-   * @param chatId id of the chat
+   * @param chat chat in which the new chat node is created
    * @param parentChatNodeId id of the parent chat node. If null, then the new chat node is a root node.
    * @param message message to be stored in the new chat node
    * @return the newly created chat node
    * @throws NoSuchElementException if the parent chat node with id [parentChatNodeId] is not found in chat with id [chatId]
    */
-  fun createChatNode(chatId: UUID, parentChatNodeId: UUID?, message: Message): ChatNode {
+  fun createChatNode(chat: Chat, parentChatNodeId: UUID?, message: Message): ChatNode {
     val parentNode: ChatNode? = parentChatNodeId?.let {
-      chatNodeRepository.findByIdAndChatId(it, chatId)
-        ?: throw NoSuchElementException("Parent ChatNode with id $it not found in chat with id $chatId")
+      chatNodeRepository.findByIdAndChatId(it, chat.id)
+        ?: throw NoSuchElementException("Parent ChatNode with id $it not found in chat with id $chat.id")
     }
 
     val ancestors = parentNode?.ancestors?.toMutableList() ?: mutableListOf()
@@ -58,14 +59,19 @@ class ChatNodeService(
 
     val newChatNode = ChatNode(
       id = message.id,
-      chatId = chatId,
+      userId = chat.userId,
+      chatId = chat.id,
       parent = parentChatNodeId,
       ancestors = ancestors,
       children = emptyList(),
       message = message
     )
 
-    parentNode?.children?.toMutableList()?.add(message.id)
+    if (parentNode != null) {
+      val children = parentNode.children.toMutableList()
+      children.add(message.id)
+      chatNodeRepository.save(parentNode.copy(children = children))
+    }
 
     return chatNodeRepository.save(newChatNode)
   }
@@ -105,14 +111,8 @@ class ChatNodeService(
       return emptyList()
     }
 
-    val ancestorLevel = node.ancestors.size
-    val minLevel = ancestorLevel + 1
-    val maxLevel = ancestorLevel + lowerLimit
-
     return chatNodeRepository.findAllByChatIdAndAncestorsContaining(
       chatId = node.chatId,
-      minSize = minLevel,
-      maxSize = maxLevel,
       ancestorId = node.id
     )
   }

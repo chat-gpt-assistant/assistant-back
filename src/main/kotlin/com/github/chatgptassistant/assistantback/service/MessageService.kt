@@ -3,7 +3,6 @@ package com.github.chatgptassistant.assistantback.service
 import com.github.chatgptassistant.assistantback.domain.*
 import com.github.chatgptassistant.assistantback.repository.ChatNodeRepository
 import com.github.chatgptassistant.assistantback.repository.ChatRepository
-import com.github.chatgptassistant.assistantback.repository.UserRepository
 import com.github.chatgptassistant.assistantback.usecase.MessageUseCase
 import org.springframework.stereotype.Service
 import java.util.*
@@ -13,31 +12,29 @@ class MessageService(
   private val chatRepository: ChatRepository,
   private val chatNodeService: ChatNodeService,
   private val aiModelService: AIModelService,
-  private val userRepository: UserRepository,
   private val chatNodeRepository: ChatNodeRepository,
 ) : MessageUseCase {
 
   override fun fetchAllMessages(
-    userId: UUID,
     chatId: UUID,
     currentNode: UUID?,
     upperLimit: Int,
     lowerLimit: Int
   ): List<ChatNode> {
-    val chat = chatRepository.findByIdAndUserId(chatId, userId)
-      ?: throw NoSuchElementException("Chat not found")
+    val chat = chatRepository.findById(chatId)
+      .orElseThrow { NoSuchElementException("Chat not found") }
 
     val currentNodeId = currentNode ?: chat.currentNode ?: return emptyList()
 
     return chatNodeService.fetchSubTree(chatId, currentNodeId, upperLimit, lowerLimit)
   }
 
-  override fun postMessageAndGenerateResponse(userId: UUID, chatId: UUID, content: Content): Message {
-    val chat = chatRepository.findByIdAndUserId(chatId, userId)
-      ?: throw NoSuchElementException("Chat not found")
+  override fun postMessageAndGenerateResponse(chatId: UUID, content: Content): List<ChatNode> {
+    val chat = chatRepository.findById(chatId)
+      .orElseThrow { NoSuchElementException("Chat not found") }
 
     val chatNode = chatNodeService.createChatNode(
-      chatId = chat.id,
+      chat = chat,
       parentChatNodeId = chat.currentNode,
       message = Message(UUID.randomUUID(), Author.USER, content = content)
     )
@@ -49,23 +46,22 @@ class MessageService(
       chatNode
     )
 
-    return aiModelResponses
+    return listOf(chatNode, aiModelResponses)
   }
 
   override fun editMessageAndRegenerateResponse(
-    userId: UUID,
     chatId: UUID,
     messageId: UUID,
     newContent: Content
-  ): Pair<Message, Message> {
-    val chat = chatRepository.findByIdAndUserId(chatId, userId)
-      ?: throw NoSuchElementException("Chat not found")
+  ): List<ChatNode> {
+    val chat = chatRepository.findById(chatId)
+      .orElseThrow { NoSuchElementException("Chat not found") }
 
     val oldMessageNode = chatNodeRepository.findByIdAndChatId(messageId, chatId)
       ?: throw NoSuchElementException("ChatNode not found")
 
     val newMessageNode = chatNodeService.createChatNode(
-      chatId = chatId,
+      chat = chat,
       parentChatNodeId = oldMessageNode.parent,
       message = Message(UUID.randomUUID(), Author.USER, content = newContent)
     )
@@ -73,13 +69,12 @@ class MessageService(
 
     val aiModelResponse = generateAIModelResponseAndAddToChat(chat, newMessageNode.message, newMessageNode)
 
-    return oldMessageNode.message to aiModelResponse
-
+    return listOf(newMessageNode, aiModelResponse)
   }
 
-  override fun regenerateResponse(userId: UUID, chatId: UUID, messageId: UUID): Message {
-    val chat = chatRepository.findByIdAndUserId(chatId, userId)
-      ?: throw NoSuchElementException("Chat not found")
+  override fun regenerateResponse(chatId: UUID, messageId: UUID): ChatNode {
+    val chat = chatRepository.findById(chatId)
+      .orElseThrow { NoSuchElementException("Chat not found") }
 
     val chatNode = chatNodeRepository.findByIdAndChatId(messageId, chatId)
       ?: throw NoSuchElementException("ChatNode not found")
@@ -93,7 +88,7 @@ class MessageService(
     chat: Chat,
     message: Message,
     parentChatNode: ChatNode?
-  ): Message {
+  ): ChatNode {
     val ancestorsSize = parentChatNode?.ancestors?.size?.plus(1) ?: 0
     val aiModelInput = buildAIModelInput(chat, message, ancestorsSize)
 
@@ -102,10 +97,10 @@ class MessageService(
     val responseContent = Content(type = ContentType.TEXT, parts = listOf(response.choices[0].message.content))
     val responseMessage = Message(UUID.randomUUID(), Author.ASSISTANT, content = responseContent)
 
-    val responseChatNode = chatNodeService.createChatNode(chat.id, parentChatNode?.id, responseMessage)
+    val responseChatNode = chatNodeService.createChatNode(chat, parentChatNode?.id, responseMessage)
 
     chatRepository.save(chat.copy(currentNode = responseChatNode.id))
-    return responseMessage
+    return responseChatNode
   }
 
   private fun buildAIModelInput(chat: Chat, message: Message, ancestorsSize: Int): AIModelInput {
