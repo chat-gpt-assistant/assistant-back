@@ -9,10 +9,11 @@ enum class Author {
 
 data class Content(
   val type: ContentType,
-  val parts: List<String>
+  val parts: List<String>,
+  val final: Boolean = true,
 ) {
   companion object {
-    fun fromText(text: String) = Content(ContentType.TEXT, listOf(text))
+    fun fromText(text: String, final: Boolean = true) = Content(ContentType.TEXT, listOf(text), final)
   }
 }
 

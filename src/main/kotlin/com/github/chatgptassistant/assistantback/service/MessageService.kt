@@ -110,7 +110,7 @@ class MessageService(
     message: Message,
     parentChatNode: ChatNode?
   ): ChatNode {
-    val responseMessage = Message(UUID.randomUUID(), Author.ASSISTANT, content = Content.fromText(""))
+    val responseMessage = Message(UUID.randomUUID(), Author.ASSISTANT, content = Content.fromText("", false))
 
     val responseChatNode = chatNodeService.createChatNode(chat, parentChatNode?.id, responseMessage)
 
@@ -122,18 +122,25 @@ class MessageService(
 
       val response = aiModelService.complete(aiModelInput)
         .onEach {
-          val content = it.choices[0].delta?.content ?: return@onEach
+          val chunk = it.choices[0]
+          val finishReason = chunk.finishReason
+          val content = chunk.delta?.content ?: ""
 
           chatNodeRepository.findById(responseChatNode.id) // TODO: optimisation: update in one request to DB
             ?.let { chatNode ->
               val parts = chatNode.message.content.parts + content
 
               val updatedMessage = chatNode.message.copy(
-                content = chatNode.message.content.copy(parts = parts)
+                content = chatNode.message.content.copy(
+                  parts = parts,
+                  final = finishReason != null
+                ),
               )
-              chatNodeRepository.save(chatNode.copy(message = updatedMessage))
 
-              eventBus.emitEvent(AIModelResponseEvent(chatId = chat.id, chatNode = chatNode))
+              val updatedChatNode = chatNode.copy(message = updatedMessage)
+              chatNodeRepository.save(updatedChatNode)
+
+              eventBus.emitEvent(AIModelResponseEvent(chatId = chat.id, chatNode = updatedChatNode))
             }
         }
 
