@@ -74,4 +74,16 @@ class ConversationResource(
 
     return conversationService.regenerateResponseForMessage(chatId, messageId)
   }
+
+  @PostMapping("/{messageId}/stop-response-generating")
+  suspend fun stopResponseGenerating(
+    @RequestHeader("Authorization") userEmail: String,
+    @PathVariable chatId: UUID,
+    @PathVariable messageId: UUID
+  ) {
+    userRepository.findByEmail(userEmail)
+      ?: throw NoSuchElementException("User not found") // TODO: replace with real security
+
+    conversationService.stopResponseGenerating(chatId, messageId)
+  }
 }

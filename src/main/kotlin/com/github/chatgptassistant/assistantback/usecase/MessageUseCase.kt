@@ -59,5 +59,10 @@ interface MessageUseCase { // TODO: rename
    */
   suspend fun regenerateResponse(chatId: UUID, messageId: UUID): ChatNode
 
+  /**
+   * Stop generating AI model response for the message.
+   */
+  suspend fun stopResponseGenerating(chatId: UUID, messageId: UUID): Unit
+
 }
 

@@ -90,4 +90,13 @@ class ConversationService(
 
     return Conversation.from(chat, listOf(chatNode))
   }
+
+  /**
+   * Stop generating response for message.
+   * @param chatId chat id
+   * @param messageId message id
+   */
+  suspend fun stopResponseGenerating(chatId: UUID, messageId: UUID) {
+    messageUseCase.stopResponseGenerating(chatId, messageId)
+  }
 }

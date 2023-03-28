@@ -97,6 +97,10 @@ class MessageService(
     return generateAIModelResponseAndAddToChat(chat, chatNode.message, parentNode)
   }
 
+  override suspend fun stopResponseGenerating(chatId: UUID, messageId: UUID): Unit {
+    TODO("Not yet implemented")
+  }
+
   /**
    * 1. Create new ChatNode in DB and return it with empty message content instantly
    * 2. Run AIModel in background and update ChatNode with responses
