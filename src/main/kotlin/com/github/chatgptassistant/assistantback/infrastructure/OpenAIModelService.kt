@@ -1,7 +1,9 @@
 package com.github.chatgptassistant.assistantback.infrastructure
 
 import com.aallam.openai.api.BetaOpenAI
+import com.aallam.openai.api.audio.TranscriptionRequest
 import com.aallam.openai.api.chat.*
+import com.aallam.openai.api.file.FileSource
 import com.aallam.openai.api.model.ModelId
 import com.aallam.openai.client.OpenAI
 import com.github.chatgptassistant.assistantback.service.*
@@ -74,6 +76,43 @@ class OpenAIModelService(
         )
       )
     }
+  }
+
+  override suspend fun transcription(request: AIModelTranscriptionRequest): AIModelTranscription {
+    val modelRequest = TranscriptionRequest(
+      model = ModelId("whisper-1"),
+      audio = FileSource(
+        name = request.audio.name,
+        source = request.audio.source,
+      ),
+      prompt = request.prompt,
+      responseFormat = request.responseFormat,
+      temperature = request.temperature,
+      language = request.language
+    )
+
+    val transcription = openAI.transcription(modelRequest)
+
+    return AIModelTranscription(
+      text = transcription.text,
+      language = transcription.language,
+      duration = transcription.duration,
+      segments = transcription.segments?.map {
+        AIModelSegment(
+          id = it.id,
+          seek = it.seek,
+          start = it.start,
+          end = it.end,
+          text = it.text,
+          tokens = it.tokens,
+          temperature = it.temperature,
+          avgLogprob = it.avgLogprob,
+          compressionRatio = it.compressionRatio,
+          noSpeechProb =  it.noSpeechProb,
+          transient = it.transient,
+        )
+      },
+    )
   }
 
   override fun getContextLimitInChars(): Int = 4096 * 5 // TODO: fix depending on the model
