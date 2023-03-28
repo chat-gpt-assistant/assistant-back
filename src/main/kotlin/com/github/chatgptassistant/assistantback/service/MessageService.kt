@@ -1,13 +1,17 @@
 package com.github.chatgptassistant.assistantback.service
 
+import AIModelResponseEvent
 import com.github.chatgptassistant.assistantback.domain.*
+import com.github.chatgptassistant.assistantback.event.AIModelResponseEventBus
 import com.github.chatgptassistant.assistantback.repository.ChatNodeRepository
 import com.github.chatgptassistant.assistantback.repository.ChatRepository
 import com.github.chatgptassistant.assistantback.usecase.MessageUseCase
-import kotlinx.coroutines.flow.onCompletion
-import kotlinx.coroutines.flow.reduce
-import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import org.springframework.stereotype.Service
 import java.util.*
 
@@ -17,6 +21,7 @@ class MessageService(
   private val chatNodeService: ChatNodeService,
   private val aiModelService: AIModelService,
   private val chatNodeRepository: ChatNodeRepository,
+  private val eventBus: AIModelResponseEventBus
 ) : MessageUseCase {
 
   override suspend fun fetchAllMessages(
@@ -51,6 +56,10 @@ class MessageService(
     )
 
     return listOf(chatNode, aiModelResponses)
+  }
+
+  override fun getGeneratedResponses(chatId: UUID): Flow<ChatNode> {
+    return eventBus.createChatNodeFlow(chatId)
   }
 
   override suspend fun editMessageAndRegenerateResponse(
@@ -88,46 +97,55 @@ class MessageService(
     return generateAIModelResponseAndAddToChat(chat, chatNode.message, parentNode)
   }
 
+  /**
+   * 1. Create new ChatNode in DB and return it with empty message content instantly
+   * 2. Run AIModel in background and update ChatNode with responses
+   * @param chat
+   * @param message
+   * @param parentChatNode
+   * @return ChatNode with empty message content (following updates will be available in DB)
+   */
   private suspend fun generateAIModelResponseAndAddToChat(
     chat: Chat,
     message: Message,
     parentChatNode: ChatNode?
   ): ChatNode {
-    val ancestorsSize = parentChatNode?.ancestors?.size ?: 0
-    val aiModelInput = buildAIModelInput(chat, message, ancestorsSize)
-
-    // when Flow is complete we should store it in DB, but meanwhile we will send chunks to user
-    val response = aiModelService.complete(aiModelInput)
-      .toList()
-      .reduce { acc, aiModelResponse ->
-        val combinedContent = (acc.choices[0].delta?.content ?: "") + (aiModelResponse.choices[0].delta?.content ?: "")
-
-        return@reduce acc.copy(
-          choices = listOf(
-            acc.choices[0].copy(
-              delta = acc.choices[0].delta?.copy(content = combinedContent)
-            )
-          )
-        )
-      }
-
-    val responseContent = Content(
-      type = ContentType.TEXT,
-      parts = listOf(response.choices[0].delta!!.content!!)
-    )
-    val responseMessage = Message(UUID.randomUUID(), Author.ASSISTANT, content = responseContent)
+    val responseMessage = Message(UUID.randomUUID(), Author.ASSISTANT, content = Content.fromText(""))
 
     val responseChatNode = chatNodeService.createChatNode(chat, parentChatNode?.id, responseMessage)
 
     chatRepository.save(chat.copy(currentNode = responseChatNode.id))
 
+    CoroutineScope(Dispatchers.IO).launch {
+      val ancestorsSize = parentChatNode?.ancestors?.size ?: 0
+      val aiModelInput = buildAIModelInput(chat, message, ancestorsSize)
+
+      val response = aiModelService.complete(aiModelInput)
+        .onEach {
+          val content = it.choices[0].delta?.content ?: return@onEach
+
+          chatNodeRepository.findById(responseChatNode.id) // TODO: optimisation: update in one request to DB
+            ?.let { chatNode ->
+              val parts = chatNode.message.content.parts + content
+
+              val updatedMessage = chatNode.message.copy(
+                content = chatNode.message.content.copy(parts = parts)
+              )
+              chatNodeRepository.save(chatNode.copy(message = updatedMessage))
+
+              eventBus.emitEvent(AIModelResponseEvent(chatId = chat.id, chatNode = chatNode))
+            }
+        }
+
+      response.collect()
+    }
 
     return responseChatNode
   }
 
   private suspend fun buildAIModelInput(chat: Chat, message: Message, ancestorsSize: Int): AIModelInput {
     val contextLimitInChars =
-      aiModelService.getContextLimitInChars() * .7 //TODO: fix. Half of the context for input and half for output
+      aiModelService.getContextLimitInChars() * .7 //TODO: replace with reasonable strategies
     val batchSize = 20
 
     val messages = mutableListOf<AIModelChatDelta>()
@@ -146,7 +164,7 @@ class MessageService(
               Author.USER -> Role.User
               Author.SYSTEM -> Role.System
             },
-            content = it.message.content.parts.joinToString(separator = " ")
+            content = it.message.content.parts.joinToString(separator = "")
           )
         }
         .takeWhile {

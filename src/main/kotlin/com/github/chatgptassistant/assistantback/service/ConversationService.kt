@@ -5,6 +5,8 @@ import com.github.chatgptassistant.assistantback.dto.MessageRequest
 import com.github.chatgptassistant.assistantback.dto.Conversation
 import com.github.chatgptassistant.assistantback.repository.ChatRepository
 import com.github.chatgptassistant.assistantback.usecase.MessageUseCase
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import org.springframework.stereotype.Service
 import java.util.*
 
@@ -44,6 +46,14 @@ class ConversationService(
       ?: throw NoSuchElementException("Chat not found")
 
     return Conversation.from(chat, chatNodes)
+  }
+
+  suspend fun getConversationUpdates(chatId: UUID): Flow<Conversation> {
+    return messageUseCase.getGeneratedResponses(chatId).map {
+      val chat = chatRepository.findById(chatId)
+        ?: throw NoSuchElementException("Chat not found")
+      Conversation.from(chat, listOf(it))
+    }
   }
 
   /**

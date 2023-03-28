@@ -2,6 +2,7 @@ package com.github.chatgptassistant.assistantback.usecase
 
 import com.github.chatgptassistant.assistantback.domain.ChatNode
 import com.github.chatgptassistant.assistantback.domain.Content
+import kotlinx.coroutines.flow.Flow
 import java.util.*
 
 /**
@@ -29,6 +30,14 @@ interface MessageUseCase { // TODO: rename
   suspend fun postMessageAndGenerateResponse(chatId: UUID, content: Content): List<ChatNode>
 
   /**
+   * Get generated responses.
+   * @see postMessageAndGenerateResponse
+   * @param chatId chat id
+   * @return flow of conversation updates
+   */
+  fun getGeneratedResponses(chatId: UUID): Flow<ChatNode>
+
+  /**
    * Edit a message and regenerate AI model response.
    *
    * @param chatId chat id
@@ -41,7 +50,6 @@ interface MessageUseCase { // TODO: rename
     messageId: UUID,
     newContent: Content
   ): List<ChatNode>
-
   /**
    * Regenerate AI model response for the message.
    *

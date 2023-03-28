@@ -70,8 +70,7 @@ class ChatNodeService(
     )
 
     if (parentNode != null) {
-      val children = parentNode.children.toMutableList()
-      children.add(message.id)
+      val children = parentNode.children + message.id
       chatNodeRepository.save(parentNode.copy(children = children))
     }
 
