@@ -113,5 +113,5 @@ class OpenAIModelService(
     )
   }
 
-  override fun getContextLimitInChars(): Int = 4096 * 5 // TODO: fix depending on the model
+  override fun getContextLimitInChars(): Int = 4096 * 4 // TODO: fix depending on the model
 }
