@@ -1,4 +1,4 @@
-package com.github.chatgptassistant.assistantback.dto
+package com.github.chatgptassistant.assistantback.model
 
 import com.github.chatgptassistant.assistantback.domain.Chat
 import com.github.chatgptassistant.assistantback.domain.ChatNode

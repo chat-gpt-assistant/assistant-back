@@ -1,8 +1,8 @@
 package com.github.chatgptassistant.assistantback.service
 
 import com.github.chatgptassistant.assistantback.domain.Content
-import com.github.chatgptassistant.assistantback.dto.MessageRequest
-import com.github.chatgptassistant.assistantback.dto.Conversation
+import com.github.chatgptassistant.assistantback.model.MessageRequest
+import com.github.chatgptassistant.assistantback.model.Conversation
 import com.github.chatgptassistant.assistantback.repository.ChatRepository
 import com.github.chatgptassistant.assistantback.usecase.MessageUseCase
 import kotlinx.coroutines.flow.Flow

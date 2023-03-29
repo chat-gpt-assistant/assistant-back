@@ -6,6 +6,8 @@ import com.aallam.openai.api.chat.*
 import com.aallam.openai.api.file.FileSource
 import com.aallam.openai.api.model.ModelId
 import com.aallam.openai.client.OpenAI
+import com.github.chatgptassistant.assistantback.model.AudioSegment
+import com.github.chatgptassistant.assistantback.model.AudioTranscription
 import com.github.chatgptassistant.assistantback.service.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -78,27 +80,23 @@ class OpenAIModelService(
     }
   }
 
-  override suspend fun transcription(request: AIModelTranscriptionRequest): AIModelTranscription {
+  override suspend fun transcription(fileSource: com.github.chatgptassistant.assistantback.model.FileSource): AudioTranscription {
     val modelRequest = TranscriptionRequest(
       model = ModelId("whisper-1"),
       audio = FileSource(
-        name = request.audio.name,
-        source = request.audio.source,
+        name = fileSource.name,
+        source = fileSource.source,
       ),
-      prompt = request.prompt,
-      responseFormat = request.responseFormat,
-      temperature = request.temperature,
-      language = request.language
     )
 
     val transcription = openAI.transcription(modelRequest)
 
-    return AIModelTranscription(
+    return AudioTranscription(
       text = transcription.text,
       language = transcription.language,
       duration = transcription.duration,
       segments = transcription.segments?.map {
-        AIModelSegment(
+        AudioSegment(
           id = it.id,
           seek = it.seek,
           start = it.start,

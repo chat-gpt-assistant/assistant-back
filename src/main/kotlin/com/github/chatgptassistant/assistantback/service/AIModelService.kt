@@ -1,7 +1,8 @@
 package com.github.chatgptassistant.assistantback.service
 
+import com.github.chatgptassistant.assistantback.model.AudioTranscription
+import com.github.chatgptassistant.assistantback.model.FileSource
 import kotlinx.coroutines.flow.Flow
-import okio.Source
 
 data class AIModelInput(
   val messages: List<AIModelChatDelta>
@@ -41,41 +42,6 @@ data class Role(val role: String) {
   }
 }
 
-data class AIModelFileSource(
-  val name: String,
-  val source: Source,
-)
-
-data class AIModelTranscriptionRequest(
-  val audio: AIModelFileSource,
-  val model: String,
-  val prompt: String,
-  val responseFormat: String,
-  val temperature: Double,
-  val language: String,
-)
-
-data class AIModelSegment(
-  val id: Int,
-  val seek: Int,
-  val start: Double,
-  val end: Double,
-  val text: String,
-  val tokens: List<Int>,
-  val temperature: Double,
-  val avgLogprob: Double,
-  val compressionRatio: Double,
-  val noSpeechProb: Double,
-  val transient: Boolean,
-)
-
-data class AIModelTranscription(
-  val text: String,
-  val language: String? = null,
-  val duration: Double? = null,
-  val segments: List<AIModelSegment>? = null,
-)
-
 interface AIModelService {
 
   /**
@@ -85,7 +51,10 @@ interface AIModelService {
    */
   fun complete(input: AIModelInput): Flow<AIModelResponse>
 
-  suspend fun transcription(request: AIModelTranscriptionRequest): AIModelTranscription
+  /**
+   * Transcript the audio
+   */
+  suspend fun transcription(fileSource: FileSource): AudioTranscription
 
   /**
    * Get the context limit in chars
