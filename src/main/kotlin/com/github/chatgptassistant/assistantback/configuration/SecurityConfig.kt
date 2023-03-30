@@ -21,17 +21,4 @@ class SecurityConfig {
       }
     }
   }
-
-//  @Bean
-//  fun corsConfigurer(): WebMvcConfigurer {
-//    return object : WebMvcConfigurer {
-//      override fun addCorsMappings(registry: CorsRegistry) {
-//        registry.addMapping("/**")
-//          .allowedOriginPatterns("*")
-//          .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE")
-//          .allowedHeaders("*")
-//          .allowCredentials(true).maxAge(3600)
-//      }
-//    }
-//  }
 }

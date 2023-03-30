@@ -8,6 +8,7 @@ import org.springframework.validation.annotation.Validated
 @Configuration
 @EnableConfigurationProperties(ApplicationConfig.ApplicationProperties::class)
 class ApplicationConfig {
+
   @Validated
   @ConfigurationProperties(prefix = "application", ignoreUnknownFields = false)
   data class ApplicationProperties(
