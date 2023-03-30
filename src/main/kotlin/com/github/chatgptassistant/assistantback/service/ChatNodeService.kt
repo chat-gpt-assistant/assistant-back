@@ -1,124 +1,220 @@
 package com.github.chatgptassistant.assistantback.service
 
-import com.github.chatgptassistant.assistantback.domain.Chat
-import com.github.chatgptassistant.assistantback.domain.ChatNode
-import com.github.chatgptassistant.assistantback.domain.Message
+import AIModelResponseEvent
+import com.github.chatgptassistant.assistantback.domain.*
+import com.github.chatgptassistant.assistantback.event.AIModelResponseEventBus
 import com.github.chatgptassistant.assistantback.repository.ChatNodeRepository
-import kotlinx.coroutines.flow.*
-import org.springframework.data.domain.Sort
+import com.github.chatgptassistant.assistantback.repository.ChatRepository
+import com.github.chatgptassistant.assistantback.usecase.ChatNodeUseCase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import org.springframework.stereotype.Service
 import java.util.*
 
-//TODO: do we need an interface for this? Maybe we can turn it into CustomRepository?
 @Service
 class ChatNodeService(
-  private val chatNodeRepository: ChatNodeRepository
-) {
+  private val chatRepository: ChatRepository,
+  private val aiModelService: AIModelService,
+  private val chatNodeRepository: ChatNodeRepository,
+  private val eventBus: AIModelResponseEventBus
+) : ChatNodeUseCase {
 
-  /**
-   * Fetches a subtree of chat nodes tree, starting from the node with id [currentNodeId] in chat with id [chatId]
-   * and going up to [upperLimit] ancestors and down to [lowerLimit] descendants.
-   *
-   * @param chatId id of the chat
-   * @param currentNodeId id of the node from which the subtree is fetched
-   * @param upperLimit number of ancestors to fetch. If 0, then no ancestors are fetched.
-   * @param lowerLimit number of descendants to fetch. If 0, then no descendants are fetched.
-   * @return list of chat nodes in the subtree
-   * @throws NoSuchElementException if the node with id [currentNodeId] is not found in chat with id [chatId]
-   */
-  suspend fun fetchSubTree(
+  override suspend fun fetchAllMessages(
     chatId: UUID,
-    currentNodeId: UUID,
-    upperLimit: Int = 0,
-    lowerLimit: Int = 0
+    currentNode: UUID?,
+    upperLimit: Int,
+    lowerLimit: Int
   ): List<ChatNode> {
-    val currentNode = chatNodeRepository.findByIdAndChatId(currentNodeId, chatId)
+    val chat = chatRepository.findById(chatId)
+      ?: throw NoSuchElementException("Chat not found")
+
+    val currentNodeId = currentNode ?: chat.currentNode ?: return emptyList()
+
+    val subTree = chatNodeRepository.fetchSubTree(chatId, currentNodeId, upperLimit, lowerLimit)
+
+    if (currentNode != null) {
+      chatRepository.save(chat.copy(currentNode = subTree.last().id))
+    }
+
+    return subTree
+  }
+
+  override suspend fun postMessageAndGenerateResponse(chatId: UUID, content: Content): List<ChatNode> {
+    val chat = chatRepository.findById(chatId)
+      ?: throw NoSuchElementException("Chat not found")
+
+    val chatNode = chatNodeRepository.createChatNode(
+      chat = chat,
+      parentChatNodeId = chat.currentNode,
+      message = Message(UUID.randomUUID(), Author.USER, content = content)
+    )
+    chatRepository.save(chat.copy(currentNode = chatNode.id))
+
+    val aiModelResponses = generateAIModelResponseAndAddToChat(
+      chat,
+      chatNode.message,
+      chatNode
+    )
+
+    return listOf(chatNode, aiModelResponses)
+  }
+
+  override fun getGeneratedResponses(chatId: UUID): Flow<ChatNode> {
+    return eventBus.createChatNodeFlow(chatId)
+  }
+
+  override suspend fun editMessageAndRegenerateResponse(
+    chatId: UUID,
+    messageId: UUID,
+    newContent: Content
+  ): List<ChatNode> {
+    val chat = chatRepository.findById(chatId)
+      ?: throw NoSuchElementException("Chat not found")
+
+    val oldMessageNode = chatNodeRepository.findByIdAndChatId(messageId, chatId)
       ?: throw NoSuchElementException("ChatNode not found")
 
-    val ancestors = findAncestors(currentNode, upperLimit)
-    val descendants = findDescendants(currentNode, lowerLimit)
+    val newMessageNode = chatNodeRepository.createChatNode(
+      chat = chat,
+      parentChatNodeId = oldMessageNode.parent,
+      message = Message(UUID.randomUUID(), Author.USER, content = newContent)
+    )
+    chatRepository.save(chat.copy(currentNode = newMessageNode.id))
 
-    return ancestors.toList() + currentNode + descendants.toList()
+    val aiModelResponse = generateAIModelResponseAndAddToChat(chat, newMessageNode.message, newMessageNode)
+
+    return listOf(newMessageNode, aiModelResponse)
+  }
+
+  // TODO: test
+  override suspend fun regenerateResponse(chatId: UUID, messageId: UUID): ChatNode {
+    val chat = chatRepository.findById(chatId)
+      ?: throw NoSuchElementException("Chat not found")
+
+    val chatNode = chatNodeRepository.findByIdAndChatId(messageId, chatId)
+      ?: throw NoSuchElementException("ChatNode not found")
+
+    val parentNode = chatNodeRepository.deleteNodeAndDescendants(chatId, chatNode.id)
+
+    return generateAIModelResponseAndAddToChat(chat, chatNode.message, parentNode)
+  }
+
+  // TODO: test
+  override suspend fun stopResponseGenerating(chatId: UUID, messageId: UUID) {
+    val chatNode = chatNodeRepository.findByIdAndChatId(messageId, chatId)
+      ?: throw NoSuchElementException("ChatNode not found")
+
+    chatNodeRepository.save(chatNode.copy(
+      message = chatNode.message.copy(
+        content = chatNode.message.content.copy(final = true)
+      )
+    ))
   }
 
   /**
-   * Creates a new chat node in chat with id [chatId] with parent node with id [parentChatNodeId] and message [message].
-   *
-   * @param chat chat in which the new chat node is created
-   * @param parentChatNodeId id of the parent chat node. If null, then the new chat node is a root node.
-   * @param message message to be stored in the new chat node
-   * @return the newly created chat node
-   * @throws NoSuchElementException if the parent chat node with id [parentChatNodeId] is not found in chat with id [chatId]
+   * 1. Create new ChatNode in DB and return it with empty message content instantly
+   * 2. Run AIModel in background and update ChatNode with responses
+   * @param chat
+   * @param message
+   * @param parentChatNode
+   * @return ChatNode with empty message content (following updates will be available in DB)
    */
-  suspend fun createChatNode(chat: Chat, parentChatNodeId: UUID?, message: Message): ChatNode {
-    val parentNode: ChatNode? = parentChatNodeId?.let {
-      chatNodeRepository.findByIdAndChatId(it, chat.id)
-        ?: throw NoSuchElementException("Parent ChatNode with id $it not found in chat with id $chat.id")
+  private suspend fun generateAIModelResponseAndAddToChat(
+    chat: Chat,
+    message: Message,
+    parentChatNode: ChatNode?
+  ): ChatNode {
+    val responseMessage = Message(UUID.randomUUID(), Author.ASSISTANT, content = Content.fromText("", false))
+
+    val responseChatNode = chatNodeRepository.createChatNode(chat, parentChatNode?.id, responseMessage)
+
+    chatRepository.save(chat.copy(currentNode = responseChatNode.id))
+
+    CoroutineScope(Dispatchers.IO).launch {
+      val ancestorsSize = parentChatNode?.ancestors?.size ?: 0
+      val aiModelInput = buildAIModelInput(chat, message, ancestorsSize)
+
+      val response = aiModelService.complete(aiModelInput)
+        .onEach {
+          val chunk = it.choices[0]
+          val finishReason = chunk.finishReason
+          val content = chunk.delta?.content ?: ""
+
+          chatNodeRepository.findById(responseChatNode.id) // TODO: optimisation: update in one request to DB
+            ?.let { chatNode ->
+              if (chatNode.message.content.final) {
+                return@onEach // we were asked to stop generating response
+              }
+
+              val parts = chatNode.message.content.parts + content
+
+              val updatedMessage = chatNode.message.copy(
+                content = chatNode.message.content.copy(
+                  parts = parts,
+                  final = finishReason != null
+                ),
+              )
+
+              val updatedChatNode = chatNode.copy(message = updatedMessage)
+              chatNodeRepository.save(updatedChatNode)
+
+              eventBus.emitEvent(AIModelResponseEvent(chatId = chat.id, chatNode = updatedChatNode))
+            }
+        }
+
+      response.collect()
     }
 
-    val ancestors = parentNode?.ancestors?.toMutableList() ?: mutableListOf()
-    parentNode?.id?.let { ancestors.add(it) }
+    return responseChatNode
+  }
 
-    val newChatNode = ChatNode(
-      id = message.id,
-      userId = chat.userId,
-      chatId = chat.id,
-      parent = parentChatNodeId,
-      ancestors = ancestors,
-      children = emptyList(),
-      message = message
-    )
+  private suspend fun buildAIModelInput(chat: Chat, message: Message, ancestorsSize: Int): AIModelInput {
+    val contextLimitInChars =
+      aiModelService.getContextLimitInChars() * .7 //TODO: replace with reasonable strategies
+    val batchSize = 20
 
-    if (parentNode != null) {
-      val children = parentNode.children + message.id
-      chatNodeRepository.save(parentNode.copy(children = children))
+    val messages = mutableListOf<AIModelChatDelta>()
+    var charsCount = 0
+    var lastNode = message.id
+
+    for (i in 1..ancestorsSize + 1 step batchSize) {
+      val subTree = chatNodeRepository.fetchSubTree(chat.id, lastNode, batchSize - 1, 0)
+
+      subTree
+        .reversed()
+        .map {
+          AIModelChatDelta(
+            role = when (it.message.author) {
+              Author.ASSISTANT -> Role.Assistant
+              Author.USER -> Role.User
+              Author.SYSTEM -> Role.System
+            },
+            content = it.message.content.parts.joinToString(separator = "")
+          )
+        }
+        .takeWhile {
+          val newCharsCount = charsCount + (it.content?.length ?: 0)
+          if (newCharsCount > contextLimitInChars) {
+            false
+          } else {
+            charsCount = newCharsCount
+            true
+          }
+        }
+        .let { messages.addAll(it) }
+
+      if (charsCount >= contextLimitInChars) {
+        break;
+      }
+
+      lastNode = subTree.first().parent ?: break
     }
 
-    return chatNodeRepository.save(newChatNode)
+    return AIModelInput(messages.reversed())
   }
-
-  /**
-   * Deletes a chat node and all its descendants, and updates the parent node children list.
-   * @param chatId id of the chat
-   * @param chatNodeId id of the chat node to be deleted
-   * @return the parent chat node of the deleted chat node
-   */
-  suspend fun deleteNodeAndDescendants(chatId: UUID, chatNodeId: UUID): ChatNode? {
-    val currentNode = chatNodeRepository.findByIdAndChatId(chatNodeId, chatId)
-      ?: throw NoSuchElementException("ChatNode not found")
-
-    findDescendants(currentNode, Int.MAX_VALUE)
-      .map { it.id }
-      .toList()
-      .let { chatNodeRepository.deleteAllById(it) }
-
-    chatNodeRepository.delete(currentNode)
-
-    return currentNode.parent?.let { parentId ->
-      val parentNode = chatNodeRepository.findByIdAndChatId(parentId, chatId)
-        ?: throw NoSuchElementException("Parent ChatNode not found")
-
-      chatNodeRepository.save(parentNode.copy(children = parentNode.children.filter { it != chatNodeId }))
-      return parentNode
-    }
-  }
-
-  private fun findAncestors(node: ChatNode, upperLimit: Int): Flow<ChatNode> {
-    val ancestorsToFetch = node.ancestors.takeLast(upperLimit)
-    return chatNodeRepository.findAllById(ancestorsToFetch, Sort.by("message.createTime"))
-  }
-
-  private fun findDescendants(node: ChatNode, lowerLimit: Int): Flow<ChatNode> {
-    if (lowerLimit == 0) {
-      return emptyList<ChatNode>().asFlow()
-    }
-
-    return chatNodeRepository.findAllByChatIdAndAncestorsContaining(
-      chatId = node.chatId,
-      ancestorId = node.id,
-      Sort.by("message.createTime")
-    )
-  }
-
 }
 

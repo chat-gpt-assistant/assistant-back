@@ -4,7 +4,7 @@ import com.github.chatgptassistant.assistantback.domain.Content
 import com.github.chatgptassistant.assistantback.model.MessageRequest
 import com.github.chatgptassistant.assistantback.model.Conversation
 import com.github.chatgptassistant.assistantback.repository.ChatRepository
-import com.github.chatgptassistant.assistantback.usecase.MessageUseCase
+import com.github.chatgptassistant.assistantback.usecase.ChatNodeUseCase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import org.springframework.stereotype.Service
@@ -13,7 +13,7 @@ import java.util.*
 @Service
 class ConversationService(
   private val chatRepository: ChatRepository,
-  private val messageUseCase: MessageUseCase,
+  private val chatNodeUseCase: ChatNodeUseCase,
 ) {
 
   /**
@@ -25,7 +25,7 @@ class ConversationService(
    * @return conversation with messages
    */
   suspend fun getConversation(chatId: UUID, currentNode: UUID?, upperLimit: Int, lowerLimit: Int): Conversation {
-    val chatNodes = messageUseCase.fetchAllMessages(chatId, currentNode, upperLimit, lowerLimit)
+    val chatNodes = chatNodeUseCase.fetchAllMessages(chatId, currentNode, upperLimit, lowerLimit)
 
     val chat = chatRepository.findById(chatId)
       ?: throw NoSuchElementException("Chat not found")
@@ -40,7 +40,7 @@ class ConversationService(
    * @return conversation with added message
    */
   suspend fun addMessageToConversation(chatId: UUID, messageRequest: MessageRequest): Conversation {
-    val chatNodes = messageUseCase.postMessageAndGenerateResponse(chatId, Content.fromText(messageRequest.content))
+    val chatNodes = chatNodeUseCase.postMessageAndGenerateResponse(chatId, Content.fromText(messageRequest.content))
 
     val chat = chatRepository.findById(chatId)
       ?: throw NoSuchElementException("Chat not found")
@@ -49,7 +49,7 @@ class ConversationService(
   }
 
   suspend fun getConversationUpdates(chatId: UUID): Flow<Conversation> {
-    return messageUseCase.getGeneratedResponses(chatId).map {
+    return chatNodeUseCase.getGeneratedResponses(chatId).map {
       val chat = chatRepository.findById(chatId)
         ?: throw NoSuchElementException("Chat not found")
       Conversation.from(chat, listOf(it))
@@ -64,7 +64,7 @@ class ConversationService(
    * @return conversation with edited message
    */
   suspend fun editConversationMessage(chatId: UUID, nodeId: UUID, messageRequest: MessageRequest): Conversation {
-    val chatNodes = messageUseCase.editMessageAndRegenerateResponse(
+    val chatNodes = chatNodeUseCase.editMessageAndRegenerateResponse(
       chatId,
       nodeId,
       Content.fromText(messageRequest.content)
@@ -83,7 +83,7 @@ class ConversationService(
    * @return conversation with regenerated response
    */
   suspend fun regenerateResponseForMessage(chatId: UUID, messageId: UUID): Conversation {
-    val chatNode = messageUseCase.regenerateResponse(chatId, messageId)
+    val chatNode = chatNodeUseCase.regenerateResponse(chatId, messageId)
 
     val chat = chatRepository.findById(chatId)
       ?: throw NoSuchElementException("Chat not found")
@@ -97,6 +97,6 @@ class ConversationService(
    * @param messageId message id
    */
   suspend fun stopResponseGenerating(chatId: UUID, messageId: UUID) {
-    messageUseCase.stopResponseGenerating(chatId, messageId)
+    chatNodeUseCase.stopResponseGenerating(chatId, messageId)
   }
 }

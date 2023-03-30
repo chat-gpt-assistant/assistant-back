@@ -6,11 +6,11 @@ import kotlinx.coroutines.flow.Flow
 import java.util.*
 
 /**
- * Message use case.
+ * ChatNode use case.
  */
-interface MessageUseCase { // TODO: rename
+interface ChatNodeUseCase {
   /**
-   * Fetch all messages in a chat.
+   * Fetch all chat nodes in a chat.
    *
    * @param chatId chat id
    * @param currentNode current node id. If null, take the chat's current node.
@@ -50,6 +50,7 @@ interface MessageUseCase { // TODO: rename
     messageId: UUID,
     newContent: Content
   ): List<ChatNode>
+
   /**
    * Regenerate AI model response for the message.
    *
