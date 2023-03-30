@@ -2,7 +2,6 @@ package com.github.chatgptassistant.assistantback.usecase
 
 import com.github.chatgptassistant.assistantback.domain.Chat
 import kotlinx.coroutines.flow.Flow
-import org.springframework.data.domain.Page
 import java.util.*
 
 /**
