@@ -35,7 +35,13 @@ class MessageService(
 
     val currentNodeId = currentNode ?: chat.currentNode ?: return emptyList()
 
-    return chatNodeService.fetchSubTree(chatId, currentNodeId, upperLimit, lowerLimit)
+    val subTree = chatNodeService.fetchSubTree(chatId, currentNodeId, upperLimit, lowerLimit)
+
+    if (currentNode != null) {
+      chatRepository.save(chat.copy(currentNode = subTree.last().id))
+    }
+
+    return subTree
   }
 
   override suspend fun postMessageAndGenerateResponse(chatId: UUID, content: Content): List<ChatNode> {
@@ -85,6 +91,7 @@ class MessageService(
     return listOf(newMessageNode, aiModelResponse)
   }
 
+  // TODO: test
   override suspend fun regenerateResponse(chatId: UUID, messageId: UUID): ChatNode {
     val chat = chatRepository.findById(chatId)
       ?: throw NoSuchElementException("Chat not found")
@@ -97,8 +104,16 @@ class MessageService(
     return generateAIModelResponseAndAddToChat(chat, chatNode.message, parentNode)
   }
 
-  override suspend fun stopResponseGenerating(chatId: UUID, messageId: UUID): Unit {
-    TODO("Not yet implemented")
+  // TODO: test
+  override suspend fun stopResponseGenerating(chatId: UUID, messageId: UUID) {
+    val chatNode = chatNodeRepository.findByIdAndChatId(messageId, chatId)
+      ?: throw NoSuchElementException("ChatNode not found")
+
+    chatNodeRepository.save(chatNode.copy(
+      message = chatNode.message.copy(
+        content = chatNode.message.content.copy(final = true)
+      )
+    ))
   }
 
   /**
@@ -132,6 +147,10 @@ class MessageService(
 
           chatNodeRepository.findById(responseChatNode.id) // TODO: optimisation: update in one request to DB
             ?.let { chatNode ->
+              if (chatNode.message.content.final) {
+                return@onEach // we were asked to stop generating response
+              }
+
               val parts = chatNode.message.content.parts + content
 
               val updatedMessage = chatNode.message.copy(
