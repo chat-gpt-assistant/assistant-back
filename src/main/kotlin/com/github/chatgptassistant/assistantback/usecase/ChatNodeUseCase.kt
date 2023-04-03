@@ -52,18 +52,17 @@ interface ChatNodeUseCase {
   ): Flow<ChatNode>
 
   /**
-   * Regenerate AI model response for the message.
+   * Regenerate AI model response for the last message.
    *
    * @param chatId chat id
-   * @param messageId message id
    * @return response message
    */
-  suspend fun regenerateResponse(chatId: UUID, messageId: UUID): ChatNode
+  suspend fun regenerateResponse(chatId: UUID): Flow<ChatNode>
 
   /**
-   * Stop generating AI model response for the message.
+   * Stop generating AI model response for the last message.
    */
-  suspend fun stopResponseGenerating(chatId: UUID, messageId: UUID)
+  suspend fun stopResponseGenerating(chatId: UUID)
 
 }
 

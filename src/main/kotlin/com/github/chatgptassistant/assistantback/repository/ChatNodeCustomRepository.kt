@@ -3,6 +3,7 @@ package com.github.chatgptassistant.assistantback.repository
 import com.github.chatgptassistant.assistantback.domain.Chat
 import com.github.chatgptassistant.assistantback.domain.ChatNode
 import com.github.chatgptassistant.assistantback.domain.Message
+import kotlinx.coroutines.flow.Flow
 import java.util.*
 
 interface ChatNodeCustomRepository {
@@ -18,18 +19,18 @@ interface ChatNodeCustomRepository {
    * @return list of chat nodes in the subtree
    * @throws NoSuchElementException if the node with id [currentNodeId] is not found in chat with id [chatId]
    */
-  suspend fun fetchSubTree(chatId: UUID, currentNodeId: UUID, upperLimit: Int = 0, lowerLimit: Int = 0): List<ChatNode>
+  suspend fun fetchSubTree(chatId: UUID, currentNodeId: UUID, upperLimit: Int = 0, lowerLimit: Int = 0): Flow<ChatNode>
 
   /**
-   * Creates a new chat node in chat with id [chatId] with parent node with id [parentChatNodeId] and message [message].
+   * Creates a new chat node in chat with parent node with id [parentChatNodeId] and message [message].
    *
    * @param chat chat in which the new chat node is created
    * @param parentChatNodeId id of the parent chat node. If null, then the new chat node is a root node.
    * @param message message to be stored in the new chat node
-   * @return the newly created chat node
-   * @throws NoSuchElementException if the parent chat node with id [parentChatNodeId] is not found in chat with id [chatId]
+   * @return a parent and a newly created chat node
+   * @throws NoSuchElementException if the parent chat node with id [parentChatNodeId] is not found in chat
    */
-  suspend fun createChatNode(chat: Chat, parentChatNodeId: UUID?, message: Message): ChatNode
+  suspend fun createChatNode(chat: Chat, parentChatNodeId: UUID?, message: Message): Pair<ChatNode?, ChatNode>
 
   /**
    * Deletes a chat node and all its descendants, and updates the parent node children list.

@@ -78,26 +78,24 @@ class ConversationService(
   }
 
   /**
-   * Regenerate response for message.
+   * Regenerate response for the last message.
    * @param chatId chat id
-   * @param messageId message id
    * @return conversation with regenerated response
    */
-  suspend fun regenerateResponseForMessage(chatId: UUID, messageId: UUID): Conversation {
-    val chatNode = chatNodeUseCase.regenerateResponse(chatId, messageId)
+  suspend fun regenerateResponseForMessage(chatId: UUID): Conversation {
+    val chatNode = chatNodeUseCase.regenerateResponse(chatId)
 
     val chat = chatRepository.findById(chatId)
       ?: throw NoSuchElementException("Chat not found")
 
-    return Conversation.from(chat, listOf(chatNode))
+    return Conversation.from(chat, chatNode.toList())
   }
 
   /**
-   * Stop generating response for message.
+   * Stop generating response for the last message.
    * @param chatId chat id
-   * @param messageId message id
    */
-  suspend fun stopResponseGenerating(chatId: UUID, messageId: UUID) {
-    chatNodeUseCase.stopResponseGenerating(chatId, messageId)
+  suspend fun stopResponseGenerating(chatId: UUID) {
+    chatNodeUseCase.stopResponseGenerating(chatId)
   }
 }

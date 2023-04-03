@@ -24,18 +24,18 @@ class ChatNodeCustomRepositoryImpl(
     currentNodeId: UUID,
     upperLimit: Int,
     lowerLimit: Int
-  ): List<ChatNode> {
+  ): Flow<ChatNode> {
     val currentNode = findByIdAndChatId(currentNodeId, chatId)
       ?: throw NoSuchElementException("ChatNode not found")
 
-    val ancestors = findAncestors(currentNode, upperLimit)
-    val descendants = findDescendants(currentNode, lowerLimit)
+    val ancestors = findAncestors(currentNode, upperLimit).toList()
+    val descendants = findDescendants(currentNode, lowerLimit).toList()
 
-    return ancestors.toList() + currentNode + descendants.toList()
+    return (ancestors + currentNode + descendants).asFlow()
   }
 
-  override suspend fun createChatNode(chat: Chat, parentChatNodeId: UUID?, message: Message): ChatNode {
-    val parentNode: ChatNode? = parentChatNodeId?.let {
+  override suspend fun createChatNode(chat: Chat, parentChatNodeId: UUID?, message: Message): Pair<ChatNode?, ChatNode> {
+    var parentNode: ChatNode? = parentChatNodeId?.let {
       findByIdAndChatId(it, chat.id)
         ?: throw NoSuchElementException("Parent ChatNode with id $it not found in chat with id $chat.id")
     }
@@ -55,10 +55,10 @@ class ChatNodeCustomRepositoryImpl(
 
     if (parentNode != null) {
       val children = parentNode.children + message.id
-      save(parentNode.copy(children = children))
+      parentNode = save(parentNode.copy(children = children))
     }
 
-    return save(newChatNode)
+    return parentNode to save(newChatNode)
   }
 
   override suspend fun deleteNodeAndDescendants(chatId: UUID, chatNodeId: UUID): ChatNode? {
@@ -76,8 +76,7 @@ class ChatNodeCustomRepositoryImpl(
       val parentNode = findByIdAndChatId(parentId, chatId)
         ?: throw NoSuchElementException("Parent ChatNode not found")
 
-      save(parentNode.copy(children = parentNode.children.filter { it != chatNodeId }))
-      return parentNode
+      return save(parentNode.copy(children = parentNode.children.filter { it != chatNodeId }))
     }
   }
 
@@ -102,7 +101,7 @@ class ChatNodeCustomRepositoryImpl(
     val query = Query().addCriteria(
       Criteria().andOperator(
         where("chatId").isEqualTo(chatId),
-        where("ancestors").elemMatch(where("_id").isEqualTo(ancestorId))
+        where("ancestors").isEqualTo(ancestorId)
       )
     ).with(sort)
 

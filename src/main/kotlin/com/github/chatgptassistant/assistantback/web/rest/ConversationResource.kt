@@ -50,40 +50,38 @@ class ConversationResource(
     return conversationService.addMessageToConversation(chatId, messageRequest)
   }
 
-  @PatchMapping("/{messageId}")
+  @PatchMapping
   suspend fun editConversationMessage(
     @RequestHeader("Authorization") userEmail: String,
     @PathVariable chatId: UUID,
-    @PathVariable messageId: UUID,
+    @RequestParam nodeId: UUID,
     @RequestBody messageRequest: MessageRequest
   ): Conversation {
     userRepository.findByEmail(userEmail)
       ?: throw NoSuchElementException("User not found") // TODO: replace with real security
 
-    return conversationService.editConversationMessage(chatId, messageId, messageRequest)
+    return conversationService.editConversationMessage(chatId, nodeId, messageRequest)
   }
 
-  @PostMapping("/{messageId}/regenerated-response")
+  @PostMapping("/regenerated-response")
   suspend fun regenerateResponseForMessage(
     @RequestHeader("Authorization") userEmail: String,
     @PathVariable chatId: UUID,
-    @PathVariable messageId: UUID
   ): Conversation {
     userRepository.findByEmail(userEmail)
       ?: throw NoSuchElementException("User not found") // TODO: replace with real security
 
-    return conversationService.regenerateResponseForMessage(chatId, messageId)
+    return conversationService.regenerateResponseForMessage(chatId)
   }
 
-  @PostMapping("/{messageId}/stop-response-generating")
+  @PostMapping("/stop-response-generating")
   suspend fun stopResponseGenerating(
     @RequestHeader("Authorization") userEmail: String,
     @PathVariable chatId: UUID,
-    @PathVariable messageId: UUID
   ) {
     userRepository.findByEmail(userEmail)
       ?: throw NoSuchElementException("User not found") // TODO: replace with real security
 
-    conversationService.stopResponseGenerating(chatId, messageId)
+    conversationService.stopResponseGenerating(chatId)
   }
 }
