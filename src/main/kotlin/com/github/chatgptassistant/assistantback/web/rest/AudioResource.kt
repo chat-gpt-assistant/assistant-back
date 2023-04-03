@@ -18,7 +18,7 @@ class AudioResource(
   @PostMapping("/transcription", consumes = ["multipart/form-data"])
   suspend fun uploadAudio(
     @RequestPart("audio") audio: FilePart
-  ): AudioTranscription? {
+  ): AudioTranscription {
     val buffer = Buffer()
 
     audio.content().asFlow().collect {

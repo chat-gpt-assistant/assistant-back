@@ -18,7 +18,7 @@ interface ChatNodeUseCase {
    * @param lowerLimit lower limit of messages
    * @return list of chat nodes
    */
-  suspend fun fetchAllMessages(chatId: UUID, currentNode: UUID?, upperLimit: Int, lowerLimit: Int): List<ChatNode>
+  suspend fun fetchAllMessages(chatId: UUID, currentNode: UUID?, upperLimit: Int, lowerLimit: Int): Flow<ChatNode>
 
   /**
    * Post a message to the chat and generate AI model response.
@@ -27,7 +27,7 @@ interface ChatNodeUseCase {
    * @param content message content
    * @return response message
    */
-  suspend fun postMessageAndGenerateResponse(chatId: UUID, content: Content): List<ChatNode>
+  suspend fun postMessageAndGenerateResponse(chatId: UUID, content: Content): Flow<ChatNode>
 
   /**
    * Get generated responses.
@@ -49,7 +49,7 @@ interface ChatNodeUseCase {
     chatId: UUID,
     messageId: UUID,
     newContent: Content
-  ): List<ChatNode>
+  ): Flow<ChatNode>
 
   /**
    * Regenerate AI model response for the message.
@@ -63,7 +63,7 @@ interface ChatNodeUseCase {
   /**
    * Stop generating AI model response for the message.
    */
-  suspend fun stopResponseGenerating(chatId: UUID, messageId: UUID): Unit
+  suspend fun stopResponseGenerating(chatId: UUID, messageId: UUID)
 
 }
 

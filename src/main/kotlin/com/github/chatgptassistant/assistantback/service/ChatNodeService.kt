@@ -9,6 +9,7 @@ import com.github.chatgptassistant.assistantback.usecase.ChatNodeUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -28,11 +29,11 @@ class ChatNodeService(
     currentNode: UUID?,
     upperLimit: Int,
     lowerLimit: Int
-  ): List<ChatNode> {
+  ): Flow<ChatNode> {
     val chat = chatRepository.findById(chatId)
       ?: throw NoSuchElementException("Chat not found")
 
-    val currentNodeId = currentNode ?: chat.currentNode ?: return emptyList()
+    val currentNodeId = currentNode ?: chat.currentNode ?: return emptyList<ChatNode>().asFlow()
 
     val subTree = chatNodeRepository.fetchSubTree(chatId, currentNodeId, upperLimit, lowerLimit)
 
@@ -40,10 +41,10 @@ class ChatNodeService(
       chatRepository.save(chat.copy(currentNode = subTree.last().id))
     }
 
-    return subTree
+    return subTree.asFlow()
   }
 
-  override suspend fun postMessageAndGenerateResponse(chatId: UUID, content: Content): List<ChatNode> {
+  override suspend fun postMessageAndGenerateResponse(chatId: UUID, content: Content): Flow<ChatNode> {
     val chat = chatRepository.findById(chatId)
       ?: throw NoSuchElementException("Chat not found")
 
@@ -60,7 +61,7 @@ class ChatNodeService(
       chatNode
     )
 
-    return listOf(chatNode, aiModelResponses)
+    return listOf(chatNode, aiModelResponses).asFlow()
   }
 
   override fun getGeneratedResponses(chatId: UUID): Flow<ChatNode> {
@@ -71,7 +72,7 @@ class ChatNodeService(
     chatId: UUID,
     messageId: UUID,
     newContent: Content
-  ): List<ChatNode> {
+  ): Flow<ChatNode> {
     val chat = chatRepository.findById(chatId)
       ?: throw NoSuchElementException("Chat not found")
 
@@ -87,7 +88,7 @@ class ChatNodeService(
 
     val aiModelResponse = generateAIModelResponseAndAddToChat(chat, newMessageNode.message, newMessageNode)
 
-    return listOf(newMessageNode, aiModelResponse)
+    return listOf(newMessageNode, aiModelResponse).asFlow()
   }
 
   // TODO: test
