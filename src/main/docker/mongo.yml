@@ -12,6 +12,12 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: Mtzyh3w4Fp4TZgpG
     volumes:
       - mongodbdata-chatgptassistant:/data/db
+    networks:
+      - chatgptassistant-net
 
 volumes:
   mongodbdata-chatgptassistant:
+
+networks:
+  chatgptassistant-net:
+    driver: bridge

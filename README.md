@@ -29,9 +29,9 @@ git clone https://github.com/chat-gpt-assistant/assistant-back.git
 cd assistant-back
 ```
 
-2. Update the `application.yml` or `application.properties` file with your MongoDB connection details, OpenAI API key, and any other configurations you need.
+2. Update the `application-local.yml` and/or `application-docker.yml` file with your MongoDB connection details, OpenAI API key, and any other configurations you need.
 
-3. For production, create an `application-prod.yml` file in the `src/main/resources` folder with your production configurations, like the example provided above.
+3. For production, update the `application-prod.yml` file in the `src/main/resources` folder with your production configurations.
 
 4. Build the project.
 
@@ -51,16 +51,10 @@ The application will start, and you can access it at `http://localhost:8080`.
 
 You can set up a MongoDB instance using Docker and the provided `mongo.yml` file in the `/src/main/docker` folder.
 
-1. Navigate to the `/src/main/docker` folder.
+Run the MongoDB Docker container.
 
 ```
-cd src/main/docker
-```
-
-2. Run the MongoDB Docker container.
-
-```
-docker-compose -f mongo.yml up -d
+docker-compose -f ./src/main/docker/mongo.yml up -d
 ```
 
 This command will start a MongoDB container with the specified configuration, exposing the MongoDB port. Make sure your application configuration matches the settings in the `mongo.yml` file.
@@ -81,10 +75,10 @@ To build a Docker image using Jib, run:
 ./gradlew jibDockerBuild
 ```
 
-This will create a Docker image named `com.github.chat-gpt-assistant:0.0.1-SNAPSHOT`. You can then run the application using Docker:
+This will create a Docker image named `com.github.chat-gpt-assistant/assistant-back:0.0.1-SNAPSHOT`. You can then run the application using Docker:
 
 ```
-docker run -d -p 8080:8080 -p 27017:27017 --name chat-gpt-assistant com.github.chat-gpt-assistant:0.0.1-SNAPSHOT
+docker run -d -p 8080:8080 --network docker_chatgptassistant-net -e SPRING_PROFILES_ACTIVE=docker --name chat-gpt-assistant com.github.chat-gpt-assistant/assistant-back:0.0.1-SNAPSHOT
 ```
 
 ## Contributing

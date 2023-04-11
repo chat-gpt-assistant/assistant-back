@@ -1,7 +1,7 @@
 spring:
   data:
     mongodb:
-      host: localhost
+      host: mongo-chatgptassistant
       port: 27017
       database: chatgptassistant
       username: root

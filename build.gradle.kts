@@ -24,6 +24,12 @@ repositories {
 
 extra["testcontainersVersion"] = "1.17.6"
 
+jib {
+	to {
+		image = "$group/$name:$version"
+	}
+}
+
 dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
 	implementation("org.springframework.boot:spring-boot-starter-data-mongodb-reactive")

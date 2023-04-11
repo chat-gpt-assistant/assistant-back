@@ -45,7 +45,8 @@ class OpenAIModelService(
           """.trimIndent()
         ),
         *messages.toTypedArray()
-      )
+      ),
+      temperature = 0.85,
     )
 
     val completions: Flow<ChatCompletionChunk> = openAI.chatCompletions(chatCompletionRequest)
