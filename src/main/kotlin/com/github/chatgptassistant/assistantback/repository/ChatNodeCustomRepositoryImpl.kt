@@ -128,7 +128,7 @@ class ChatNodeCustomRepositoryImpl(
 
     return mongoTemplate.find(query, ChatNode::class.java)
       .asFlow()
-      .first()
+      .firstOrNull()
   }
 
   private suspend fun save(chatNode: ChatNode): ChatNode =

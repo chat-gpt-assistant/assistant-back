@@ -225,7 +225,7 @@ class ChatNodeService(
         break;
       }
 
-      lastNode = subTree.first().parent ?: break
+      lastNode = subTree.firstOrNull()?.parent ?: break
     }
 
     return AIModelInput(messages.reversed())
